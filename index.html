@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en" class="h-screen w-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editframe — Build Video With Code</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" src="./src/index.js"></script>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <style>
+      :root {
+        --bg: #060614;
+        --accent: #5eead4;
+        --accent-2: #a78bfa;
+        --accent-3: #fb923c;
+        --yellow: #fbbf24;       /* matches editframe.com hero "WEB PAGE" */
+        --pink: #ff2d92;
+        --cyan: #00e0ff;
+        --text: #f5f8fc;
+        --text-dim: #6b7c99;
+        --code-bg: #0c0c1a;
+        --code-border: rgba(94, 234, 212, 0.22);
+        --tag: #fb923c;
+        --attr: #5eead4;
+        --string: #fde68a;
+        --comment: #6b7280;
+      }
+
+      .stage {
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        background:
+          radial-gradient(circle at 50% 110%, rgba(167, 139, 250, 0.22) 0%, transparent 55%),
+          radial-gradient(circle at 50% -10%, rgba(94, 234, 212, 0.18) 0%, transparent 55%),
+          var(--bg);
+      }
+
+      /* === AMBIENT LAYERS === */
+      .grid-bg {
+        position: absolute; inset: -200px;
+        background-image:
+          linear-gradient(rgba(94, 234, 212, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(94, 234, 212, 0.06) 1px, transparent 1px);
+        background-size: 80px 80px;
+        animation: gridDrift 18s linear infinite;
+        z-index: 0; pointer-events: none;
+      }
+      @keyframes gridDrift { from { transform: translate(0,0); } to { transform: translate(80px, 80px); } }
+
+      .orb {
+        position: absolute; border-radius: 50%;
+        filter: blur(80px); opacity: 0.55; z-index: 0; pointer-events: none;
+      }
+      .orb-1 { top: 8%; left: -15%; width: 600px; height: 600px; background: var(--accent); animation: orbFloat 12s ease-in-out infinite; }
+      .orb-2 { bottom: 4%; right: -20%; width: 700px; height: 700px; background: var(--accent-2); animation: orbFloat 14s ease-in-out infinite reverse; }
+      @keyframes orbFloat {
+        0%, 100% { transform: translate(0,0); }
+        50% { transform: translate(80px, -120px); }
+      }
+
+      /* === GLOBAL PUNCH-TRANSITION (per-scene wrapper) ===
+         Each scene fades+scales+blurs in at scene start and out at scene end.
+         The animation timeline is anchored to each ef-timegroup's --ef-progress. */
+      .scene-wrap {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        padding: 80px; text-align: center; z-index: 1;
+        animation: scenePunch 1s cubic-bezier(.2,.9,.2,1) both, sceneOut 0.45s cubic-bezier(.6,0,.6,1) both;
+        animation-delay: 0s, calc(var(--ef-duration) - 0.45s);
+      }
+      @keyframes scenePunch {
+        0%   { opacity: 0; transform: scale(1.08); filter: blur(28px) brightness(1.4); }
+        40%  { opacity: 1; transform: scale(0.99); filter: blur(0) brightness(1.05); }
+        100% { opacity: 1; transform: scale(1); filter: blur(0) brightness(1); }
+      }
+      @keyframes sceneOut {
+        from { opacity: 1; transform: scale(1); filter: blur(0); }
+        to   { opacity: 0; transform: scale(0.94); filter: blur(20px); }
+      }
+
+      /* Flash bar between scenes (renders inside each scene at start) */
+      .punch-flash {
+        position: absolute; inset: 0;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        mix-blend-mode: screen;
+        opacity: 0;
+        animation: punchFlash 0.35s ease-out both;
+        pointer-events: none; z-index: 5;
+      }
+      @keyframes punchFlash {
+        0%   { opacity: 0.55; transform: scaleY(0.04); }
+        50%  { opacity: 0.45; transform: scaleY(1); }
+        100% { opacity: 0;    transform: scaleY(1); }
+      }
+
+      /* === TYPOGRAPHY === */
+      .display {
+        font-family: "Inter", sans-serif;
+        font-weight: 900;
+        font-size: 200px;
+        line-height: 0.85;
+        letter-spacing: -0.055em;
+        text-transform: uppercase;
+      }
+      .display-md { font-size: 132px; }
+      .accent { color: var(--accent); }
+      .accent-2 { color: var(--accent-2); }
+      .accent-3 { color: var(--accent-3); }
+
+      .label {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 500; font-size: 32px;
+        letter-spacing: 0.2em; text-transform: uppercase;
+        color: var(--text-dim);
+      }
+
+      .caption-bar {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        padding: 22px 38px;
+        border-radius: 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600; font-size: 34px;
+        letter-spacing: 0.04em;
+        color: var(--text);
+        display: inline-block;
+      }
+
+      /* === SCENE 1 — hook === */
+      @keyframes slamIn {
+        0%   { opacity: 0; transform: translateY(80px) scale(0.72); filter: blur(18px); }
+        55%  { opacity: 1; transform: translateY(-8px) scale(1.03); filter: blur(0); }
+        100% { transform: translateY(0) scale(1); }
+      }
+      .aberration {
+        text-shadow:
+          -3px 0 rgba(255, 45, 146, 0.85),
+           3px 0 rgba(0, 224, 255, 0.85);
+      }
+      @keyframes rgbJitter {
+        0%, 100% { text-shadow: -3px 0 rgba(255,45,146,0.85), 3px 0 rgba(0,224,255,0.85); }
+        25%      { text-shadow: -5px 0 rgba(255,45,146,0.95), 5px 0 rgba(0,224,255,0.95); }
+        50%      { text-shadow: -2px 0 rgba(255,45,146,0.7), 2px 0 rgba(0,224,255,0.7); }
+        75%      { text-shadow: -6px 0 rgba(255,45,146,0.9), 6px 0 rgba(0,224,255,0.9); }
+      }
+      .jitter { animation: rgbJitter 0.25s steps(4) infinite; }
+
+      /* Floating tag/code particles for scene 1 */
+      .particle {
+        position: absolute;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--accent);
+        opacity: 0.18;
+        font-size: 28px;
+        font-weight: 500;
+        animation: particleDrift 9s linear infinite;
+        pointer-events: none;
+      }
+      @keyframes particleDrift {
+        0%   { transform: translateY(40px) translateX(0); opacity: 0; }
+        15%  { opacity: 0.25; }
+        85%  { opacity: 0.25; }
+        100% { transform: translateY(-80px) translateX(40px); opacity: 0; }
+      }
+
+      /* === SCENE 2 — MINI TERMINALS (background) === */
+      .mini-term {
+        position: absolute;
+        background: rgba(8, 8, 18, 0.92);
+        border: 1px solid rgba(94, 234, 212, 0.18);
+        border-radius: 14px;
+        padding: 14px 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 19px;
+        line-height: 1.55;
+        color: var(--text-dim);
+        box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+        overflow: hidden;
+        opacity: 0;
+        animation: softIn 0.55s ease-out both;
+      }
+      .mini-term .prompt { color: var(--accent); font-weight: 600; }
+      .mini-term .ok     { color: #6ee7b7; }
+      .mini-term .warn   { color: var(--accent-3); }
+      .mini-term .dim    { color: var(--comment); }
+      .mini-term .key    { color: var(--accent-2); }
+      .mini-term .v      { color: var(--string); }
+      .mini-term-bar {
+        display: flex; gap: 6px; margin-bottom: 10px;
+      }
+      .mini-term-bar i {
+        display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+      }
+      .mini-term-bar i:nth-child(1) { background: #ff5f56; }
+      .mini-term-bar i:nth-child(2) { background: #ffbd2e; }
+      .mini-term-bar i:nth-child(3) { background: #27c93f; }
+      .mt-1 { top: 60px;   left: 24px;  width: 380px; transform: rotate(-2.5deg); animation-delay: 0.3s; }
+      .mt-2 { top: 80px;   right: 28px; width: 340px; transform: rotate(2deg);    animation-delay: 0.55s; font-size: 17px; }
+      .mt-3 { bottom: 80px; left: 32px; width: 400px; transform: rotate(-1.5deg); animation-delay: 0.8s; }
+      .mt-4 { bottom: 100px; right: 30px; width: 360px; transform: rotate(2.5deg); animation-delay: 1.05s; font-size: 17px; }
+      .mt-1 .mini-term-title,
+      .mt-2 .mini-term-title,
+      .mt-3 .mini-term-title,
+      .mt-4 .mini-term-title {
+        position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+        font-size: 13px; color: var(--text-dim); letter-spacing: 0.05em;
+      }
+      .mt-footer {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px dashed rgba(255,255,255,0.08);
+        color: var(--accent-3); font-size: 16px;
+        opacity: 0;
+        animation: softIn 0.4s ease-out both 3.5s;
+      }
+      .stream-line .err { color: #ff6b6b; }
+      .stream-line .done { color: #6ee7b7; font-weight: 600; }
+      .stream-line {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        opacity: 0;
+        animation: lineType 0.6s steps(40, end) both, lineFade 0.15s ease-out both;
+      }
+      @keyframes lineType { from { width: 0; } to { width: 100%; } }
+      @keyframes lineFade { to   { opacity: 1; } }
+
+      /* === SCENE 2 — IDE === */
+      .ide-card {
+        background: var(--code-bg);
+        border: 1px solid var(--code-border);
+        border-radius: 26px;
+        box-shadow:
+          0 60px 120px rgba(0,0,0,0.55),
+          0 0 0 1px rgba(94,234,212,0.1) inset,
+          0 0 100px rgba(94,234,212,0.15);
+        overflow: hidden;
+        width: 920px;
+        font-family: "JetBrains Mono", monospace;
+        position: relative;
+      }
+      .ide-bar {
+        display: flex; gap: 10px; padding: 18px 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        background: rgba(0,0,0,0.35);
+      }
+      .ide-dot { width: 14px; height: 14px; border-radius: 50%; }
+      .ide-dot.red    { background: #ff5f56; }
+      .ide-dot.yellow { background: #ffbd2e; }
+      .ide-dot.green  { background: #27c93f; }
+      .ide-file       { margin-left: auto; font-size: 22px; color: var(--text-dim); font-weight: 500; }
+      .ide-body       { padding: 36px 40px; font-size: 36px; line-height: 1.6; text-align: left; color: var(--text); }
+      .ln             { display: inline-block; width: 40px; color: var(--comment); margin-right: 16px; user-select: none; }
+      .tag            { color: var(--tag); }
+      .attr           { color: var(--attr); }
+      .string         { color: var(--string); }
+      .punct          { color: #94a3b8; }
+      /* Blinking caret */
+      .caret {
+        display: inline-block;
+        width: 14px; height: 36px;
+        background: var(--accent);
+        margin-left: 2px; vertical-align: -6px;
+        animation: caretBlink 0.85s steps(2, start) infinite;
+        box-shadow: 0 0 12px var(--accent);
+      }
+      @keyframes caretBlink { 50% { opacity: 0; } }
+
+      .render-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(94,234,212,0.3);
+        border-radius: 26px;
+        box-shadow:
+          0 60px 120px rgba(0,0,0,0.55),
+          0 0 80px rgba(94,234,212,0.22);
+        width: 920px; height: 300px;
+        display: flex; align-items: center; justify-content: center;
+        position: relative; overflow: hidden;
+      }
+      .render-card::before {
+        content: "● REC  ·  RENDER PREVIEW";
+        position: absolute; top: 18px; left: 26px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px; letter-spacing: 0.2em;
+        color: var(--accent); opacity: 0.85;
+        animation: recPulse 1.4s ease-in-out infinite;
+      }
+      @keyframes recPulse { 50% { opacity: 0.4; } }
+      .render-card::after {
+        content: ""; position: absolute; bottom: 0; left: 0;
+        height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        animation: renderBar 4s linear infinite;
+        box-shadow: 0 0 12px var(--accent);
+      }
+      @keyframes renderBar { from { width: 0; } to { width: 100%; } }
+      .render-text {
+        font-family: "Inter", sans-serif; font-weight: 900;
+        font-size: 96px; letter-spacing: -0.04em; color: var(--text);
+      }
+
+      /* Visual sync wave between IDE and render */
+      .sync-wave {
+        position: absolute; left: 50%; transform: translateX(-50%);
+        width: 360px; height: 4px;
+        background: linear-gradient(90deg, transparent, var(--accent-2), transparent);
+        animation: syncFlow 1.6s ease-in-out infinite;
+        opacity: 0.7;
+      }
+      @keyframes syncFlow {
+        0%   { transform: translate(-50%, 0) scaleX(0.2); opacity: 0; }
+        50%  { transform: translate(-50%, 0) scaleX(1); opacity: 1; }
+        100% { transform: translate(-50%, 0) scaleX(0.2); opacity: 0; }
+      }
+
+      /* === SCENE 3 — component pills === */
+      .pill {
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700; font-size: 64px;
+        padding: 28px 56px; border-radius: 100px;
+        background: rgba(94,234,212,0.08);
+        border: 2px solid rgba(94,234,212,0.4);
+        color: var(--accent);
+        box-shadow: 0 0 60px rgba(94,234,212,0.2);
+        margin: 14px 0; white-space: nowrap;
+        opacity: 0; position: relative;
+      }
+      .pill.violet { color: var(--accent-2); background: rgba(167,139,250,0.08); border-color: rgba(167,139,250,0.4); box-shadow: 0 0 60px rgba(167,139,250,0.2); }
+      .pill.orange { color: var(--accent-3); background: rgba(251,146,60,0.08); border-color: rgba(251,146,60,0.45); box-shadow: 0 0 60px rgba(251,146,60,0.22); }
+      .pill::after {
+        content: ""; position: absolute; right: -28px; top: 50%;
+        width: 56px; height: 2px;
+        background: linear-gradient(90deg, currentColor, transparent);
+        opacity: 0.5;
+      }
+      .pill:last-child::after { display: none; }
+
+      @keyframes pillIn {
+        0%   { opacity: 0; transform: translateX(-100px) scale(0.8) rotate(-3deg); }
+        60%  { opacity: 1; transform: translateX(12px) scale(1.05) rotate(1deg); }
+        100% { transform: translateX(0) scale(1) rotate(0); }
+      }
+      @keyframes pillGlow {
+        0%, 100% { box-shadow: 0 0 60px rgba(94,234,212,0.2); transform: translateY(0); }
+        50%      { box-shadow: 0 0 110px rgba(94,234,212,0.55); transform: translateY(-6px); }
+      }
+
+      /* === SCENE 4 — pipeline === */
+      .pipe-node {
+        display: flex; flex-direction: column; align-items: center; gap: 18px;
+      }
+      .pipe-icon {
+        width: 156px; height: 156px;
+        border-radius: 30px;
+        background: rgba(255,255,255,0.05);
+        border: 2px solid rgba(94,234,212,0.4);
+        display: flex; align-items: center; justify-content: center;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700; font-size: 64px; color: var(--accent);
+        box-shadow: 0 0 60px rgba(94,234,212,0.3);
+        position: relative;
+      }
+      .pipe-icon.mid { color: var(--accent-2); border-color: rgba(167,139,250,0.4); box-shadow: 0 0 60px rgba(167,139,250,0.35); }
+      .pipe-icon.end { color: var(--accent-3); border-color: rgba(251,146,60,0.55); box-shadow: 0 0 70px rgba(251,146,60,0.4); }
+      .pipe-icon.mid::after {
+        content: ""; position: absolute; inset: -8px;
+        border: 2px solid var(--accent-2); border-radius: 36px;
+        border-top-color: transparent; border-right-color: transparent;
+        animation: spinRing 1.6s linear infinite;
+        opacity: 0.55;
+      }
+      @keyframes spinRing { to { transform: rotate(360deg); } }
+
+      .pipe-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 26px; letter-spacing: 0.2em;
+        text-transform: uppercase; color: var(--text-dim);
+      }
+      .pipe-row { display: flex; align-items: center; gap: 38px; }
+
+      .arrow {
+        width: 96px; height: 6px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        border-radius: 3px; position: relative;
+      }
+      .arrow::after {
+        content: ""; position: absolute; right: -2px; top: -10px;
+        border-left: 18px solid var(--accent-2);
+        border-top: 13px solid transparent;
+        border-bottom: 13px solid transparent;
+      }
+      /* Data packet traveling along the arrow */
+      .arrow::before {
+        content: ""; position: absolute; top: -7px; left: -4px;
+        width: 20px; height: 20px; border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 24px var(--accent), 0 0 48px var(--accent);
+        animation: packet 1.6s ease-in-out infinite;
+      }
+      @keyframes packet {
+        0%   { left: -8px; opacity: 0; }
+        15%  { opacity: 1; }
+        85%  { opacity: 1; }
+        100% { left: calc(100% - 12px); opacity: 0; }
+      }
+
+      @keyframes pipeIn {
+        from { opacity: 0; transform: translateY(40px) scale(0.85); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* === SCENE 5 — CTA === */
+      .cta-ring {
+        position: absolute;
+        width: 1100px; height: 1100px;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 0deg, transparent 0%, var(--accent) 25%, var(--accent-2) 50%, var(--accent-3) 75%, transparent 100%
+        );
+        filter: blur(70px); opacity: 0.55;
+        animation: ringSpin 8s linear infinite;
+        z-index: 0;
+      }
+      @keyframes ringSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* Particle burst (5 dots that explode outward) */
+      .burst { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 1; }
+      .burst span {
+        position: absolute; left: 0; top: 0;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 24px var(--accent);
+        opacity: 0;
+        animation: burstOut 1.2s cubic-bezier(.2,1,.4,1) both;
+        animation-delay: 0.4s;
+      }
+      .burst span:nth-child(1) { --tx:  280px; --ty: -180px; background: var(--accent);  box-shadow: 0 0 24px var(--accent); }
+      .burst span:nth-child(2) { --tx: -260px; --ty: -200px; background: var(--accent-2); box-shadow: 0 0 24px var(--accent-2); }
+      .burst span:nth-child(3) { --tx:  240px; --ty:  220px; background: var(--accent-3); box-shadow: 0 0 24px var(--accent-3); }
+      .burst span:nth-child(4) { --tx: -290px; --ty:  160px; background: var(--accent);   box-shadow: 0 0 24px var(--accent); }
+      .burst span:nth-child(5) { --tx:    0px; --ty: -280px; background: var(--accent-2); box-shadow: 0 0 24px var(--accent-2); }
+      .burst span:nth-child(6) { --tx:    0px; --ty:  260px; background: var(--accent-3); box-shadow: 0 0 24px var(--accent-3); }
+      @keyframes burstOut {
+        0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+        40%  { opacity: 1; }
+        100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.3); }
+      }
+
+      .cta-mark {
+        font-family: "Inter", sans-serif;
+        font-weight: 900;
+        font-size: 220px;
+        letter-spacing: -0.06em;
+        line-height: 0.85;
+        position: relative; z-index: 2;
+      }
+      .cta-handle {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 36px; letter-spacing: 0.15em;
+        color: var(--text-dim); margin-top: 36px;
+        position: relative; z-index: 2;
+      }
+      .cta-bar {
+        width: 420px; height: 6px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+        border-radius: 3px; margin-top: 56px;
+        animation: ctaPulse 1.4s ease-in-out infinite alternate;
+        position: relative; z-index: 2;
+      }
+      @keyframes ctaPulse {
+        from { transform: scaleX(0.8); opacity: 0.7; }
+        to   { transform: scaleX(1.2); opacity: 1; }
+      }
+
+      /* === GENERIC HELPERS === */
+      @keyframes softIn {
+        from { opacity: 0; transform: translateY(28px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes charTypeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* === KINETIC SUBTITLE BAR (centered, bottom of every scene) === */
+      .subtitle {
+        position: absolute;
+        left: 80px; right: 80px; bottom: 90px;
+        margin: 0 auto;
+        max-width: 920px;
+        padding: 22px 36px;
+        background: rgba(8, 8, 18, 0.78);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 16px;
+        font-family: "Inter", sans-serif;
+        font-weight: 800;
+        font-size: 44px;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        color: var(--text);
+        text-align: center;
+        z-index: 4;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+        opacity: 0;
+        word-wrap: break-word;
+        animation: softIn 0.45s ease-out both 0.15s;
+      }
+      .subtitle ef-text { display: inline; }
+      .subtitle .hl { color: var(--accent); }
+      .subtitle .hl-2 { color: var(--accent-2); }
+      .subtitle .hl-3 { color: var(--accent-3); }
+      @keyframes wordPop {
+        0%   { opacity: 0; color: var(--yellow); transform: translateY(16px) scale(0.85); text-shadow: 0 0 32px rgba(251,191,36,0.85); }
+        40%  { opacity: 1; color: var(--yellow); transform: translateY(-4px) scale(1.18); text-shadow: 0 0 36px rgba(251,191,36,0.95), 0 0 8px rgba(251,191,36,0.6); }
+        70%  { opacity: 1; color: var(--yellow); transform: translateY(0) scale(1.05); text-shadow: 0 0 18px rgba(251,191,36,0.5); }
+        100% { opacity: 1; color: var(--text); transform: translateY(0) scale(1); text-shadow: none; }
+      }
+    </style>
+  </head>
+
+  <body class="h-full w-full m-0 p-0 bg-slate-900">
+    <ef-timegroup
+      workbench
+      mode="fixed"
+      duration="27s"
+      class="stage relative overflow-hidden w-[1080px] h-[1920px]"
+    >
+      <!-- Ambient layers visible across entire 27s -->
+      <div class="grid-bg"></div>
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+
+      <!-- Scene sequence: NO overlap; punch-transition handles the visual bridge -->
+      <ef-timegroup mode="sequence" class="absolute inset-0 z-10">
+
+        <!-- ============ SCENE 1 — HOOK (0-3.5s) ============ -->
+        <ef-timegroup mode="fixed" duration="3.5s" class="scene-wrap">
+          <ef-audio src="./assets/voice-s1.mp3" volume="1"></ef-audio>
+          <div class="punch-flash"></div>
+
+          <!-- Floating code particles -->
+          <div class="particle" style="top: 10%; left: 12%; animation-delay: 0s;">&lt;ef-text /&gt;</div>
+          <div class="particle" style="top: 22%; right: 8%; animation-delay: 1.5s;">&lt;ef-video /&gt;</div>
+          <div class="particle" style="bottom: 18%; left: 10%; animation-delay: 3s;">render()</div>
+          <div class="particle" style="bottom: 8%; right: 14%; animation-delay: 4.5s;">&lt;ef-audio /&gt;</div>
+
+          <div class="label aberration" style="animation: softIn 0.5s ease-out both 0.3s; margin-bottom: 56px;">
+            // editframe.com
+          </div>
+          <ef-text
+            split="word"
+            stagger="130ms"
+            class="display"
+            style="font-size: 180px; animation: slamIn 0.7s cubic-bezier(.22,1.4,.36,1) both; animation-delay: calc(var(--ef-stagger-offset) + 0.3s);"
+          >
+            Video is a
+          </ef-text>
+          <div class="display jitter" style="font-size: 220px; margin-top: 8px; color: var(--yellow); animation: slamIn 0.7s cubic-bezier(.22,1.4,.36,1) both 1.3s;">
+            Web&nbsp;Page
+          </div>
+          <div class="display" style="font-size: 110px; margin-top: 14px; letter-spacing: 0.04em; animation: slamIn 0.6s cubic-bezier(.22,1.4,.36,1) both 1.95s;">
+            that moves.
+          </div>
+          <div class="subtitle">
+            <ef-text split="word" stagger="120ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 0.4s);">
+              Video is a <span style="color: var(--yellow);">web page</span> that moves.
+            </ef-text>
+          </div>
+        </ef-timegroup>
+
+        <!-- ============ SCENE 2 — DEV COCKPIT (3.5-9s) ============ -->
+        <ef-timegroup mode="fixed" duration="5.5s" class="scene-wrap" style="gap: 50px;">
+          <ef-audio src="./assets/voice-s2.mp3" volume="1"></ef-audio>
+          <div class="punch-flash"></div>
+
+          <!-- Mini background terminals — Claude Code style realism + rotations -->
+          <div class="mini-term mt-1">
+            <div class="mini-term-bar"><i></i><i></i><i></i><span class="mini-term-title">install — editframe — 72×16</span></div>
+            <span class="stream-line" style="animation-delay: 0.5s, 0.5s;"><span class="prompt">$</span> npm create @editframe@latest</span>
+            <span class="stream-line" style="animation-delay: 1.0s, 1.0s;"><span class="dim">✓ Scaffolding html template</span></span>
+            <span class="stream-line" style="animation-delay: 1.5s, 1.5s;"><span class="ok">+</span> @editframe/elements <span class="dim">0.53.2</span></span>
+            <span class="stream-line" style="animation-delay: 2.0s, 2.0s;"><span class="ok">+</span> @editframe/cli <span class="dim">0.53.2</span></span>
+            <span class="stream-line" style="animation-delay: 2.5s, 2.5s;"><span class="done">●</span> Done in <span class="v">2.4s</span></span>
+            <div class="mt-footer">▸▸ auto mode on (shift+tab to cycle)</div>
+          </div>
+          <div class="mini-term mt-2">
+            <div class="mini-term-bar"><i></i><i></i><i></i><span class="mini-term-title">preview — vite — 64×14</span></div>
+            <span class="stream-line" style="animation-delay: 0.75s, 0.75s;"><span class="prompt">$</span> npx editframe preview</span>
+            <span class="stream-line" style="animation-delay: 1.25s, 1.25s;"><span class="key">VITE</span> v8.0.12  <span class="done">ready in 501ms</span></span>
+            <span class="stream-line" style="animation-delay: 1.75s, 1.75s;"><span class="dim">→ Local:</span>  <span class="v">http://localhost:4321</span></span>
+            <span class="stream-line" style="animation-delay: 2.25s, 2.25s;"><span class="dim">watching</span> <span class="v">src/**/*</span></span>
+            <span class="stream-line" style="animation-delay: 2.75s, 2.75s;"><span class="done">●</span> hmr update <span class="v">/index.html</span></span>
+          </div>
+          <div class="mini-term mt-3">
+            <div class="mini-term-bar"><i></i><i></i><i></i><span class="mini-term-title">render — editframe — 80×16</span></div>
+            <span class="stream-line" style="animation-delay: 1.0s, 1.0s;"><span class="prompt">$</span> editframe render --fps 30</span>
+            <span class="stream-line" style="animation-delay: 1.5s, 1.5s;"><span class="dim">▸</span> frame <span class="v">001 / 810</span>  <span class="dim">elapsed 0.1s</span></span>
+            <span class="stream-line" style="animation-delay: 2.0s, 2.0s;"><span class="dim">▸</span> frame <span class="v">240 / 810</span>  <span class="dim">elapsed 4.8s</span></span>
+            <span class="stream-line" style="animation-delay: 2.5s, 2.5s;"><span class="dim">▸</span> frame <span class="v">600 / 810</span>  <span class="dim">elapsed 11.7s</span></span>
+            <span class="stream-line" style="animation-delay: 3.0s, 3.0s;"><span class="done">✓</span> rendered <span class="v">810 / 810</span>  <span class="done">Done for 16s</span></span>
+            <div class="mt-footer">▸▸ auto mode on (shift+tab to cycle)</div>
+          </div>
+          <div class="mini-term mt-4">
+            <div class="mini-term-bar"><i></i><i></i><i></i><span class="mini-term-title">api — editframe — 60×14</span></div>
+            <span class="stream-line" style="animation-delay: 1.25s, 1.25s;"><span class="prompt">POST</span> <span class="v">/v1/renders</span>  <span class="done">201</span></span>
+            <span class="stream-line" style="animation-delay: 1.75s, 1.75s;">  <span class="key">render_id</span>: <span class="v">"rnd_8k3p"</span></span>
+            <span class="stream-line" style="animation-delay: 2.25s, 2.25s;">  <span class="key">duration</span>:  <span class="v">27s @ 1080p</span></span>
+            <span class="stream-line" style="animation-delay: 2.75s, 2.75s;">  <span class="key">status</span>:    <span class="done">"complete"</span></span>
+            <span class="stream-line" style="animation-delay: 3.25s, 3.25s;"><span class="dim">→ output.mp4</span>  <span class="v">4.2 MB</span></span>
+          </div>
+
+          <div class="ide-card" style="animation: softIn 0.55s cubic-bezier(.2,.8,.2,1) both;">
+            <div class="ide-bar">
+              <div class="ide-dot red"></div>
+              <div class="ide-dot yellow"></div>
+              <div class="ide-dot green"></div>
+              <div class="ide-file">composition.html</div>
+            </div>
+            <div class="ide-body">
+              <div>
+                <span class="ln">1</span>
+                <span class="punct">&lt;</span><span class="tag">ef-timegroup</span>
+                <span class="attr"> mode</span><span class="punct">=</span><span class="string">"sequence"</span><span class="punct">&gt;</span>
+              </div>
+              <div>
+                <span class="ln">2</span>
+                &nbsp;&nbsp;<span class="punct">&lt;</span><span class="tag">ef-text</span>
+                <span class="attr"> split</span><span class="punct">=</span><span class="string">"word"</span><span class="punct">&gt;</span>
+              </div>
+              <div>
+                <span class="ln">3</span>
+                &nbsp;&nbsp;&nbsp;&nbsp;<ef-text
+                  split="char"
+                  stagger="55ms"
+                  style="animation: charTypeIn 0.15s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 0.9s);"
+                >Hello, Editframe.</ef-text><span class="caret" style="animation-delay: 0s;"></span>
+              </div>
+              <div>
+                <span class="ln">4</span>
+                &nbsp;&nbsp;<span class="punct">&lt;/</span><span class="tag">ef-text</span><span class="punct">&gt;</span>
+              </div>
+              <div>
+                <span class="ln">5</span>
+                <span class="punct">&lt;/</span><span class="tag">ef-timegroup</span><span class="punct">&gt;</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sync-wave" style="top: 50%;"></div>
+
+          <div class="render-card" style="animation: softIn 0.65s cubic-bezier(.2,.8,.2,1) both 0.5s;">
+            <ef-text
+              split="char"
+              stagger="55ms"
+              class="render-text"
+              style="animation: charTypeIn 0.18s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 1.5s);"
+            >
+              Hello, Editframe.
+            </ef-text>
+          </div>
+
+          <div class="subtitle">
+            <ef-text split="word" stagger="100ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 0.3s);">
+              Write a few components. <span class="hl">Watch it render. Live.</span>
+            </ef-text>
+          </div>
+        </ef-timegroup>
+
+        <!-- ============ SCENE 3 — COMPONENTS (9-15s) ============ -->
+        <ef-timegroup mode="fixed" duration="6s" class="scene-wrap" style="justify-content: center;">
+          <ef-audio src="./assets/voice-s3.mp3" volume="1"></ef-audio>
+          <div class="punch-flash"></div>
+
+          <div class="label" style="animation: softIn 0.5s ease-out both; margin-bottom: 56px;">
+            // primitives
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div class="pill"        style="animation: pillIn 0.55s cubic-bezier(.2,.8,.2,1) both 0.0s, pillGlow 2.2s ease-in-out infinite 1.4s;">&lt;ef-timegroup /&gt;</div>
+            <div class="pill violet" style="animation: pillIn 0.55s cubic-bezier(.2,.8,.2,1) both 0.35s, pillGlow 2.2s ease-in-out infinite 1.6s;">&lt;ef-text /&gt;</div>
+            <div class="pill orange" style="animation: pillIn 0.55s cubic-bezier(.2,.8,.2,1) both 0.7s, pillGlow 2.2s ease-in-out infinite 1.8s;">&lt;ef-video /&gt;</div>
+            <div class="pill"        style="animation: pillIn 0.55s cubic-bezier(.2,.8,.2,1) both 1.05s, pillGlow 2.2s ease-in-out infinite 2.0s;">&lt;ef-audio /&gt;</div>
+            <div class="pill violet" style="animation: pillIn 0.55s cubic-bezier(.2,.8,.2,1) both 1.4s, pillGlow 2.2s ease-in-out infinite 2.2s;">&lt;ef-image /&gt;</div>
+          </div>
+          <div class="subtitle">
+            <ef-text split="word" stagger="140ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 0.4s);">
+              Components. <span class="hl-2">Not timelines.</span>
+            </ef-text>
+          </div>
+        </ef-timegroup>
+
+        <!-- ============ SCENE 4 — PIPELINE (15-21s) ============ -->
+        <ef-timegroup mode="fixed" duration="6s" class="scene-wrap">
+          <ef-audio src="./assets/voice-s4.mp3" volume="1"></ef-audio>
+          <div class="punch-flash"></div>
+
+          <div class="label" style="animation: softIn 0.5s ease-out both; margin-bottom: 80px;">
+            // pipeline
+          </div>
+          <div class="pipe-row">
+            <div class="pipe-node" style="animation: pipeIn 0.55s cubic-bezier(.2,.8,.2,1) both 0.0s;">
+              <div class="pipe-icon">{ }</div>
+              <div class="pipe-label">Code</div>
+            </div>
+            <div class="arrow" style="animation: pipeIn 0.4s ease-out both 0.35s;"></div>
+            <div class="pipe-node" style="animation: pipeIn 0.55s cubic-bezier(.2,.8,.2,1) both 0.5s;">
+              <div class="pipe-icon mid">▶</div>
+              <div class="pipe-label">Browser</div>
+            </div>
+            <div class="arrow" style="animation: pipeIn 0.4s ease-out both 0.85s;"></div>
+            <div class="pipe-node" style="animation: pipeIn 0.55s cubic-bezier(.2,.8,.2,1) both 1.0s;">
+              <div class="pipe-icon end">MP4</div>
+              <div class="pipe-label">Render</div>
+            </div>
+          </div>
+          <div class="subtitle">
+            <ef-text split="word" stagger="110ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 0.3s);">
+              Preview in your browser. <span class="hl-3">Render in the cloud.</span>
+            </ef-text>
+          </div>
+        </ef-timegroup>
+
+        <!-- ============ SCENE 5 — CTA (21-27s) ============ -->
+        <ef-timegroup mode="fixed" duration="6s" class="scene-wrap" style="position: relative;">
+          <ef-audio src="./assets/voice-s5.mp3" volume="1"></ef-audio>
+          <div class="punch-flash"></div>
+
+          <div class="cta-ring"></div>
+          <div class="burst">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+
+          <ef-text
+            split="char"
+            stagger="50ms"
+            class="cta-mark"
+            style="animation: slamIn 0.8s cubic-bezier(.22,1.4,.36,1) both; animation-delay: var(--ef-stagger-offset);"
+          >
+            <span class="accent">Edit</span><span class="accent-2">frame</span>
+          </ef-text>
+          <div class="subtitle">
+            <ef-text split="word" stagger="100ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 1.0s);">
+              <span class="hl">Editframe.</span> Built by <span style="color: var(--yellow);">Claude</span>. Rendered in the cloud.
+            </ef-text>
+          </div>
+          <div class="cta-handle" style="animation: softIn 0.6s ease-out both 2.0s;">
+            @GinquelLimitless · editframe.com
+          </div>
+          <div class="cta-bar"></div>
+        </ef-timegroup>
+
+      </ef-timegroup>
+    </ef-timegroup>
+  </body>
+</html>

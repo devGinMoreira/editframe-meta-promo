@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Editframe vite-plugin transcode cache (auto-generated at preview time)
+src/assets/.cache/
+
+# Legacy assets from earlier Claude Design Promo experiment
+src/assets/voice-en.mp3
+src/assets/voice-pt.mp3
+src/assets/F001-prototype.png
+src/assets/F002-knobs.png
+
+# Playwright artifacts
+.playwright-mcp/
+
+# Debug screenshots captured during development
+audit-*.jpeg
+audit-*.png
+v*.jpeg
+v*.png
+preview-*.jpeg
+preview-*.png
+export-modal.jpeg
+editframe-home.png
+editframe-docs.png
+editframe-getting-started.png
+meta-preview-*.jpeg
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
