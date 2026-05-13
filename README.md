@@ -61,7 +61,7 @@ Press the **Export** button in the Workbench (top-right) → choose `DOM` → **
 ## Regenerate the voiceover
 
 ```bash
-# Reads ELEVENLABS_API_KEY from ~/.claude/credentials.env or env var
+# Set ELEVENLABS_API_KEY in your environment, then:
 node scripts/generate-voice.mjs
 ```
 
@@ -69,4 +69,4 @@ Override the voice with `VOICE_ID=<elevenlabs_voice_id>`.
 
 ---
 
-Built by **[Ginquel Moreira](https://www.upwork.com/freelancers/~012d1cf522c2961356)** ([Limitless GMTech Solutions](https://limitless-gmtech.com)) for Jeremy Yudkin / Editframe.
+Built by **[Ginquel Moreira](https://www.upwork.com/freelancers/~012d1cf522c2961356)** — [Limitless GMTech Solutions](https://limitless-gmtech.com).
