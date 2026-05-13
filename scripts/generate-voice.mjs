@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
  * Generate ElevenLabs voiceover MP3s per scene.
- * Reads ELEVENLABS_API_KEY from ~/.claude/credentials.env or env.
+ * Requires ELEVENLABS_API_KEY env var.
  * Writes src/assets/voice-s{N}.mp3
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
@@ -16,11 +15,7 @@ mkdirSync(assetsDir, { recursive: true });
 
 function loadApiKey() {
   if (process.env.ELEVENLABS_API_KEY) return process.env.ELEVENLABS_API_KEY;
-  const credPath = resolve(homedir(), ".claude", "credentials.env");
-  const text = readFileSync(credPath, "utf8");
-  const m = text.match(/^ELEVENLABS_API_KEY=(.+)$/m);
-  if (!m) throw new Error("ELEVENLABS_API_KEY not found in env or " + credPath);
-  return m[1].trim();
+  throw new Error("Set ELEVENLABS_API_KEY in your environment before running this script.");
 }
 
 const apiKey = loadApiKey();

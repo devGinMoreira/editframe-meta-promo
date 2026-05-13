@@ -21,7 +21,7 @@ Written as a single HTML composition using `<ef-*>` web components, rendered cli
 | 2 — Dev cockpit | 5.5s | 4 angled mini-terminals streaming realistic CLI output + a central IDE + live render preview |
 | 3 — Components | 6s | Pill stack of primitives: `<ef-timegroup />`, `<ef-text />`, `<ef-video />`, `<ef-audio />`, `<ef-image />` |
 | 4 — Pipeline | 6s | Code → Browser → MP4 with traveling data packets along the arrows |
-| 5 — CTA | 6s | Rotating conic-gradient glow ring + particle burst + "Built by Claude. Rendered in the cloud." |
+| 5 — CTA | 6s | Rotating conic-gradient glow ring + particle burst + "Voice by ElevenLabs. Rendered in the cloud." |
 
 All animation is **CSS keyframes** — no JS animation runtime. Editframe's time engine ([`--ef-stagger-offset`](https://editframe.com/docs/composition/text), per-scene `mode="fixed"` durations) drives everything.
 
