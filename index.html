@@ -202,10 +202,27 @@
       .mini-term-bar i:nth-child(1) { background: #ff5f56; }
       .mini-term-bar i:nth-child(2) { background: #ffbd2e; }
       .mini-term-bar i:nth-child(3) { background: #27c93f; }
-      .mt-1 { top: 60px;   left: 24px;  width: 380px; transform: rotate(-2.5deg); animation-delay: 0.3s; }
-      .mt-2 { top: 80px;   right: 28px; width: 340px; transform: rotate(2deg);    animation-delay: 0.55s; font-size: 17px; }
-      .mt-3 { bottom: 80px; left: 32px; width: 400px; transform: rotate(-1.5deg); animation-delay: 0.8s; }
-      .mt-4 { bottom: 100px; right: 30px; width: 360px; transform: rotate(2.5deg); animation-delay: 1.05s; font-size: 17px; }
+      /* Terminals enter with softIn, then drift continuously while visible */
+      .mt-1 { top: 60px;   left: 24px;  width: 380px; --rot: -2.5deg; transform: rotate(var(--rot)); animation: softIn 0.55s ease-out both 0.3s,  termFloatA 5.5s ease-in-out infinite 1s; }
+      .mt-2 { top: 80px;   right: 28px; width: 340px; --rot:  2deg;   transform: rotate(var(--rot)); animation: softIn 0.55s ease-out both 0.55s, termFloatB 6s ease-in-out infinite 1.3s; font-size: 17px; }
+      .mt-3 { bottom: 80px; left: 32px; width: 400px; --rot: -1.5deg; transform: rotate(var(--rot)); animation: softIn 0.55s ease-out both 0.8s,  termFloatC 5s ease-in-out infinite 1.5s; }
+      .mt-4 { bottom: 100px; right: 30px; width: 360px; --rot: 2.5deg; transform: rotate(var(--rot)); animation: softIn 0.55s ease-out both 1.05s, termFloatD 6.5s ease-in-out infinite 1.8s; font-size: 17px; }
+      @keyframes termFloatA {
+        0%, 100% { transform: rotate(-2.5deg) translate(0, 0); }
+        50%      { transform: rotate(-1.5deg) translate(10px, -14px); }
+      }
+      @keyframes termFloatB {
+        0%, 100% { transform: rotate(2deg) translate(0, 0); }
+        50%      { transform: rotate(3deg) translate(-12px, 10px); }
+      }
+      @keyframes termFloatC {
+        0%, 100% { transform: rotate(-1.5deg) translate(0, 0); }
+        50%      { transform: rotate(-3deg) translate(-8px, -10px); }
+      }
+      @keyframes termFloatD {
+        0%, 100% { transform: rotate(2.5deg) translate(0, 0); }
+        50%      { transform: rotate(1.2deg) translate(14px, 12px); }
+      }
       .mt-1 .mini-term-title,
       .mt-2 .mini-term-title,
       .mt-3 .mini-term-title,
@@ -489,6 +506,17 @@
         from { opacity: 0; transform: translateY(8px); }
         to   { opacity: 1; transform: translateY(0); }
       }
+      @keyframes bgZoom {
+        from { transform: scale(1.0); opacity: 0; }
+        20%  { opacity: 0.88; }
+        to   { transform: scale(1.06); opacity: 0.88; }
+      }
+      /* Ken Burns zoom for Scene 1 framed homepage — starts wide, slowly zooms in */
+      @keyframes kenBurnsIn {
+        0%   { transform: translateX(-50%) scale(1.0)  translateY(0);   opacity: 0; filter: blur(8px); }
+        15%  { opacity: 0.92; filter: blur(0); }
+        100% { transform: translateX(-50%) scale(1.18) translateY(-8px); opacity: 0.92; filter: blur(0); }
+      }
 
       /* === KINETIC SUBTITLE BAR (centered, bottom of every scene) === */
       .subtitle {
@@ -546,6 +574,9 @@
         <ef-timegroup mode="fixed" duration="3.5s" class="scene-wrap">
           <ef-audio src="./assets/voice-s1.mp3" volume="1"></ef-audio>
           <div class="punch-flash"></div>
+
+          <!-- Editframe.com homepage PROMINENTLY visible — the actual brand reference -->
+          <img src="./src/assets/editframe-home.png" alt="" style="position: absolute; top: 100px; left: 50%; width: 88%; max-height: 380px; object-fit: contain; opacity: 0.92; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,0.6); z-index: 0; pointer-events: none; animation: kenBurnsIn 3.5s ease-out both;" />
 
           <!-- Floating code particles -->
           <div class="particle" style="top: 10%; left: 12%; animation-delay: 0s;">&lt;ef-text /&gt;</div>
@@ -733,28 +764,34 @@
           <ef-audio src="./assets/voice-s5.mp3" volume="1"></ef-audio>
           <div class="punch-flash"></div>
 
+          <!-- Editframe.com homepage PROMINENTLY visible behind the CTA wordmark -->
+          <img src="./src/assets/editframe-home-2.png" alt="" style="position: absolute; bottom: 220px; left: 50%; transform: translateX(-50%); width: 95%; max-height: 1000px; object-fit: contain; opacity: 0.92; border-radius: 20px; box-shadow: 0 40px 100px rgba(0,0,0,0.75); z-index: 0; pointer-events: none;" />
+
           <div class="cta-ring"></div>
           <div class="burst">
             <span></span><span></span><span></span><span></span><span></span><span></span>
           </div>
 
-          <ef-text
-            split="char"
-            stagger="50ms"
-            class="cta-mark"
-            style="animation: slamIn 0.8s cubic-bezier(.22,1.4,.36,1) both; animation-delay: var(--ef-stagger-offset);"
-          >
-            <span class="accent">Edit</span><span class="accent-2">frame</span>
-          </ef-text>
+          <!-- Wordmark group near top with comfortable padding from edge -->
+          <div style="position: absolute; top: 200px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 16px; z-index: 2; width: 100%; padding: 0 60px;">
+            <ef-text
+              split="char"
+              stagger="50ms"
+              class="cta-mark"
+              style="animation: slamIn 0.8s cubic-bezier(.22,1.4,.36,1) both; animation-delay: var(--ef-stagger-offset);"
+            >
+              <span class="accent">Edit</span><span class="accent-2">frame</span>
+            </ef-text>
+            <div class="cta-handle" style="animation: softIn 0.6s ease-out both 2.0s;">
+              @GinquelLimitless · editframe.com
+            </div>
+            <div class="cta-bar"></div>
+          </div>
           <div class="subtitle">
             <ef-text split="word" stagger="100ms" style="animation: wordPop 0.35s ease-out both; animation-delay: calc(var(--ef-stagger-offset) + 1.0s);">
               <span class="hl">Editframe.</span> Built by <span style="color: var(--yellow);">Claude</span>. Rendered in the cloud.
             </ef-text>
           </div>
-          <div class="cta-handle" style="animation: softIn 0.6s ease-out both 2.0s;">
-            @GinquelLimitless · editframe.com
-          </div>
-          <div class="cta-bar"></div>
         </ef-timegroup>
 
       </ef-timegroup>
