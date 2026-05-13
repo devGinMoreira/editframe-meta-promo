@@ -138,7 +138,7 @@
       @keyframes slamIn {
         0%   { opacity: 0; transform: translateY(80px) scale(0.72); filter: blur(18px); }
         55%  { opacity: 1; transform: translateY(-8px) scale(1.03); filter: blur(0); }
-        100% { transform: translateY(0) scale(1); }
+        100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
       }
       .aberration {
         text-shadow:
@@ -345,7 +345,7 @@
       @keyframes pillIn {
         0%   { opacity: 0; transform: translateX(-100px) scale(0.8) rotate(-3deg); }
         60%  { opacity: 1; transform: translateX(12px) scale(1.05) rotate(1deg); }
-        100% { transform: translateX(0) scale(1) rotate(0); }
+        100% { opacity: 1; transform: translateX(0) scale(1) rotate(0); }
       }
       @keyframes pillGlow {
         0%, 100% { box-shadow: 0 0 60px rgba(94,234,212,0.2); transform: translateY(0); }
@@ -456,10 +456,11 @@
       .cta-mark {
         font-family: "Inter", sans-serif;
         font-weight: 900;
-        font-size: 220px;
+        font-size: 150px;
         letter-spacing: -0.06em;
         line-height: 0.85;
         position: relative; z-index: 2;
+        max-width: 920px;
       }
       .cta-handle {
         font-family: "JetBrains Mono", monospace;
@@ -563,7 +564,7 @@
           >
             Video is a
           </ef-text>
-          <div class="display jitter" style="font-size: 220px; margin-top: 8px; color: var(--yellow); animation: slamIn 0.7s cubic-bezier(.22,1.4,.36,1) both 1.3s;">
+          <div class="display jitter" style="font-size: 140px; margin-top: 14px; color: var(--yellow); animation: slamIn 0.7s cubic-bezier(.22,1.4,.36,1) both 1.3s;">
             Web&nbsp;Page
           </div>
           <div class="display" style="font-size: 110px; margin-top: 14px; letter-spacing: 0.04em; animation: slamIn 0.6s cubic-bezier(.22,1.4,.36,1) both 1.95s;">
